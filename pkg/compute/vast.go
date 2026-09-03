@@ -14,7 +14,7 @@ const (
 	// Beta9 workers need a rootful Docker daemon. Vast's regular instances do
 	// not support Docker-in-Docker, so managed workers must use Vast's KVM
 	// image, which provides a full Ubuntu VM with Docker and systemd.
-	VastWorkerImage  = "docker.io/vastai/kvm:ubuntu_terminal"
+	VastWorkerImage  = "docker.io/vastai/kvm:cuda-12.8.1-auto"
 	VastWorkerDiskGB = 32
 )
 
