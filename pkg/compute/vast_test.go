@@ -20,6 +20,7 @@ func TestListOffersNormalizesVastBundle(t *testing.T) {
 		require.Equal(t, "on-demand", body["type"])
 		require.Equal(t, map[string]any{"eq": true}, body["rentable"])
 		require.Equal(t, map[string]any{"eq": true}, body["verified"])
+		require.Equal(t, map[string]any{"eq": true}, body["vms_enabled"])
 		require.Equal(t, map[string]any{"in": []any{"RTX A6000"}}, body["gpu_name"])
 		require.NotContains(t, body, "q")
 		_, _ = w.Write([]byte(`{"offers":[{"id":123,"gpu_name":"RTX A6000","num_gpus":8,"dph_total":10.5,"cpu_cores":64,"cpu_ram":512,"geolocation":"US","rentable_count":2}]}`))
@@ -66,9 +67,27 @@ func TestCreateReservationConfiguresVastOnstart(t *testing.T) {
 	require.Equal(t, "instance-123", reservation.ID)
 	require.Equal(t, "beam-workspace-training-machine-123", body["label"])
 	require.Equal(t, "machine-123", body["client_id"])
+	require.Equal(t, VastWorkerImage, body["image"])
+	require.Equal(t, float64(VastWorkerDiskGB), body["disk"])
+	require.Equal(t, "ssh_direct", body["runtype"])
 	require.Equal(t, "machine-123", reservation.MachineID)
 	require.Equal(t, "beam-workspace-training-machine-123", reservation.Name)
+	require.Contains(t, body["onstart"], "#!/usr/bin/env bash")
+	require.Contains(t, body["onstart"], "set -euo pipefail")
 	require.Contains(t, body["onstart"], "--join-token token")
+}
+
+func TestListOffersNormalizesVastConsumerGPUName(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+		require.Equal(t, map[string]any{"in": []any{"RTX 4090"}}, body["gpu_name"])
+		_, _ = w.Write([]byte(`{"offers":[]}`))
+	}))
+	defer server.Close()
+
+	_, err := NewVast(VastConfig{APIKey: "test-key", BaseURL: server.URL}).ListOffers(context.Background(), OfferRequest{GPUs: []string{"RTX4090"}})
+	require.NoError(t, err)
 }
 
 func TestGetReservationPreservesVastMappedSSHEndpoint(t *testing.T) {

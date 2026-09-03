@@ -9,7 +9,14 @@ import (
 	"time"
 )
 
-const VastDefaultBaseURL = "https://console.vast.ai/api/v0"
+const (
+	VastDefaultBaseURL = "https://console.vast.ai/api/v0"
+	// Beta9 workers need a rootful Docker daemon. Vast's regular instances do
+	// not support Docker-in-Docker, so managed workers must use Vast's KVM
+	// image, which provides a full Ubuntu VM with Docker and systemd.
+	VastWorkerImage  = "docker.io/vastai/kvm:ubuntu_terminal"
+	VastWorkerDiskGB = 32
+)
 
 type VastClient struct {
 	api HTTPClient
@@ -41,9 +48,10 @@ func (c *VastClient) Name() string {
 
 func (c *VastClient) ListOffers(ctx context.Context, req OfferRequest) ([]Offer, error) {
 	body := map[string]any{
-		"type":     "on-demand",
-		"rentable": map[string]any{"eq": true},
-		"verified": map[string]any{"eq": true},
+		"type":        "on-demand",
+		"rentable":    map[string]any{"eq": true},
+		"verified":    map[string]any{"eq": true},
+		"vms_enabled": map[string]any{"eq": true},
 	}
 	if len(req.GPUs) > 0 {
 		body["gpu_name"] = map[string]any{"in": vastGPUQueryNames(req.GPUs)}
@@ -85,6 +93,10 @@ func vastGPUQueryNames(gpus []string) []string {
 		switch NormalizeGPU(gpu) {
 		case "A6000":
 			names = append(names, "RTX A6000")
+		case "RTX4090":
+			names = append(names, "RTX 4090")
+		case "RTX5090":
+			names = append(names, "RTX 5090")
 		default:
 			names = append(names, gpu)
 		}
@@ -103,9 +115,12 @@ func (c *VastClient) CreateReservation(ctx context.Context, req ReservationReque
 	body := map[string]any{
 		"label":     ReservationNodeName(req),
 		"client_id": clientID,
+		"image":     VastWorkerImage,
+		"disk":      VastWorkerDiskGB,
+		"runtype":   "ssh_direct",
 	}
 	if req.BootstrapCommand != "" {
-		body["onstart"] = req.BootstrapCommand
+		body["onstart"] = fmt.Sprintf("#!/usr/bin/env bash\nset -euo pipefail\n%s\n", req.BootstrapCommand)
 	}
 
 	var raw map[string]any
