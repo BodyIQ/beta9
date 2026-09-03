@@ -120,7 +120,16 @@ func (c *VastClient) CreateReservation(ctx context.Context, req ReservationReque
 		"runtype":   "ssh_direct",
 	}
 	if req.BootstrapCommand != "" {
-		body["onstart"] = fmt.Sprintf("#!/usr/bin/env bash\nset -euo pipefail\n%s\n", req.BootstrapCommand)
+		body["onstart"] = fmt.Sprintf(`#!/usr/bin/env bash
+set -euo pipefail
+# Vast's KVM cloud-init currently appends bare SSH public-key payloads to
+# /etc/environment. They are not valid environment assignments and break apt
+# package hooks that source the file during the agent's runtime installation.
+if [ -f /etc/environment ]; then
+  sed -i '/^[[:space:]]*AAAA[[:alnum:]\/+\=]*\([[:space:]].*\)\?$/d' /etc/environment
+fi
+%s
+`, req.BootstrapCommand)
 	}
 
 	var raw map[string]any

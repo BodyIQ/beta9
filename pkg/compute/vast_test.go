@@ -74,6 +74,8 @@ func TestCreateReservationConfiguresVastOnstart(t *testing.T) {
 	require.Equal(t, "beam-workspace-training-machine-123", reservation.Name)
 	require.Contains(t, body["onstart"], "#!/usr/bin/env bash")
 	require.Contains(t, body["onstart"], "set -euo pipefail")
+	require.Contains(t, body["onstart"], "sed -i")
+	require.Contains(t, body["onstart"], "/etc/environment")
 	require.Contains(t, body["onstart"], "--join-token token")
 }
 
