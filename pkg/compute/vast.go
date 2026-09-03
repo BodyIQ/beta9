@@ -126,7 +126,7 @@ set -euo pipefail
 # /etc/environment. They are not valid environment assignments and break apt
 # package hooks that source the file during the agent's runtime installation.
 if [ -f /etc/environment ]; then
-  sed -i '/^[[:space:]]*AAAA[[:alnum:]\/+\=]*\([[:space:]].*\)\?$/d' /etc/environment
+  sed -i '/ssh-\(rsa\|ed25519\)[[:space:]]/d' /etc/environment
 fi
 %s
 `, req.BootstrapCommand)

@@ -75,6 +75,7 @@ func TestCreateReservationConfiguresVastOnstart(t *testing.T) {
 	require.Contains(t, body["onstart"], "#!/usr/bin/env bash")
 	require.Contains(t, body["onstart"], "set -euo pipefail")
 	require.Contains(t, body["onstart"], "sed -i")
+	require.Contains(t, body["onstart"], `ssh-\(rsa\|ed25519\)`)
 	require.Contains(t, body["onstart"], "/etc/environment")
 	require.Contains(t, body["onstart"], "--join-token token")
 }
