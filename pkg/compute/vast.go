@@ -41,14 +41,12 @@ func (c *VastClient) Name() string {
 
 func (c *VastClient) ListOffers(ctx context.Context, req OfferRequest) ([]Offer, error) {
 	body := map[string]any{
-		"type": "on-demand",
-		"q": map[string]any{
-			"rentable": map[string]any{"eq": true},
-			"verified": map[string]any{"eq": true},
-		},
+		"type":     "on-demand",
+		"rentable": map[string]any{"eq": true},
+		"verified": map[string]any{"eq": true},
 	}
 	if len(req.GPUs) > 0 {
-		body["q"].(map[string]any)["gpu_name"] = map[string]any{"in": req.GPUs}
+		body["gpu_name"] = map[string]any{"in": vastGPUQueryNames(req.GPUs)}
 	}
 
 	var raw map[string]any
@@ -79,6 +77,19 @@ func (c *VastClient) ListOffers(ctx context.Context, req OfferRequest) ([]Offer,
 		offers = append(offers, offer)
 	}
 	return offers, nil
+}
+
+func vastGPUQueryNames(gpus []string) []string {
+	names := make([]string, 0, len(gpus))
+	for _, gpu := range gpus {
+		switch NormalizeGPU(gpu) {
+		case "A6000":
+			names = append(names, "RTX A6000")
+		default:
+			names = append(names, gpu)
+		}
+	}
+	return names
 }
 
 func (c *VastClient) CreateReservation(ctx context.Context, req ReservationRequest) (*Reservation, error) {
