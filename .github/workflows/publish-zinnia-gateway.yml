@@ -49,8 +49,8 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: |
-            ghcr.io/bodyiq/beta9-gateway:sha-${{ github.sha }}
-            ghcr.io/bodyiq/beta9-gateway:main
+            ghcr.io/bodyiq/beta9/gateway:sha-${{ github.sha }}
+            ghcr.io/bodyiq/beta9/gateway:main
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
