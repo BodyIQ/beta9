@@ -17,6 +17,10 @@ Kubernetes, or cloud-provider credentials. The GHCR package must be public so
 the cluster can pull immutable gateway images without a long-lived image-pull
 credential.
 
+The current package predates this workflow. In its package settings, connect
+`BodyIQ/beta9` and grant that repository Actions write access before the first
+merge publication.
+
 Production deployment state does not live in this fork. The pinned chart,
 gateway image tag, public endpoint configuration, and operator deployment
 script live under `deploy/zinnia-apps/beta9` in `BodyIQ/zinnia-apps`.
