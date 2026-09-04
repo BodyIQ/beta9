@@ -387,6 +387,14 @@ cache:
     originFallbackEnabled: false
 
 providers:
+  # Vast capacity runs the external agent inside a full VM because the agent
+  # needs rootful Docker, namespaces, and systemd. Both worker settings are
+  # required when apiKey is configured. Offer prices include this disk size.
+  vast:
+    apiKey:
+    baseURL: https://console.vast.ai/api/v0
+    workerImage:
+    workerDiskGB: 0
   ec2:
     awsAccessKey:
     awsSecretKey:

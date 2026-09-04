@@ -215,6 +215,60 @@ func TestReconcileOnDemandFailoverLaunchesAlternateGPUWithinHourlyBudget(t *test
 	}
 }
 
+func TestReconcileOnDemandFailoverRejectsUndersizedGPUOffer(t *testing.T) {
+	var createCalls int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/instances/types":
+			_, _ = w.Write([]byte(`{"instance_types":[{
+				"id":"sf-h100-1",
+				"cloud":"test-cloud",
+				"shade_instance_type":"H100",
+				"hourly_price":2,
+				"deployment_type":"vm",
+				"configuration":{"gpu_type":"H100","num_gpus":1,"vcpus":12,"memory_in_gb":70,"storage_in_gb":128},
+				"availability":[{"region":"test-region","available":true}]
+			}]}`))
+		case "/instances/create":
+			createCalls++
+			_, _ = w.Write([]byte(`{"id":"reservation-1"}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	config := testOnDemandConfig()
+	config.Chains = map[string]types.FailoverChain{
+		"H100": {OnDemand: &types.FailoverOnDemandStep{GPUs: []types.GpuType{types.GPU_H100}, MaxNodes: 1}},
+	}
+	computeRepo := &fakeComputeRepo{demand: map[string]*model.FailoverDemand{
+		"H100": {GPU: "H100", GPUCount: 4, CreatedAt: time.Now().UTC()},
+	}}
+	managedStates := &fakeComputeRepo{}
+	service := &Service{
+		appConfig: types.AppConfig{
+			Providers: types.ProviderConfig{
+				Shadeform: types.ShadeformProviderConfig{ApiKey: "test-key", BaseURL: server.URL},
+			},
+			Scheduling: types.SchedulingConfig{Failover: config},
+		},
+		backendRepo:     &fakeManagedPoolBackendRepo{},
+		computeRepo:     computeRepo,
+		managedPoolRepo: &fakeManagedPoolRepo{repo: managedStates},
+	}
+
+	if err := service.reconcileOnDemandFailover(context.Background(), time.Now().UTC()); err != nil {
+		t.Fatalf("reconcileOnDemandFailover() error = %v", err)
+	}
+	if createCalls != 0 {
+		t.Fatalf("provider create calls = %d, want 0", createCalls)
+	}
+	if _, exists := computeRepo.demand["H100"]; !exists {
+		t.Fatal("unsatisfied multi-GPU demand was cleared")
+	}
+}
+
 func TestReconcileOnDemandFailoverReportsOfferOutsideHourlyHeadroom(t *testing.T) {
 	var createCalls int
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -114,6 +114,7 @@ func (s *Service) launchPoolCapacityLocked(ctx context.Context, workspaceID, act
 			PoolName:       pool.Name,
 			Selector:       pool.Selector,
 			GPUs:           pool.GPUs,
+			GPUCount:       pool.GPUCount,
 			Nodes:          pool.Nodes,
 			OfferID:        pool.OfferID,
 			TTL:            pool.TTL,
@@ -504,8 +505,10 @@ func (s *Service) computeVendors() map[string]model.Vendor {
 	vendors := map[string]model.Vendor{}
 	if s.appConfig.Providers.Vast.ApiKey != "" {
 		vendors["vast"] = model.NewVast(model.VastConfig{
-			APIKey:  s.appConfig.Providers.Vast.ApiKey,
-			BaseURL: s.appConfig.Providers.Vast.BaseURL,
+			APIKey:       s.appConfig.Providers.Vast.ApiKey,
+			BaseURL:      s.appConfig.Providers.Vast.BaseURL,
+			WorkerImage:  s.appConfig.Providers.Vast.WorkerImage,
+			WorkerDiskGB: s.appConfig.Providers.Vast.WorkerDiskGB,
 		})
 	}
 	if s.appConfig.Providers.Shadeform.ApiKey != "" {
@@ -554,6 +557,7 @@ func (s *Service) collectPoolOffers(ctx context.Context, pool model.Pool) ([]mod
 
 	request := model.OfferRequest{
 		GPUs:           pool.GPUs,
+		GPUCount:       pool.GPUCount,
 		Nodes:          pool.Nodes,
 		OfferID:        pool.OfferID,
 		Providers:      pool.Providers,

@@ -737,8 +737,10 @@ type ProviderConfig struct {
 }
 
 type VastProviderConfig struct {
-	ApiKey  string `key:"apiKey" json:"api_key"`
-	BaseURL string `key:"baseURL" json:"base_url"`
+	ApiKey       string `key:"apiKey" json:"api_key"`
+	BaseURL      string `key:"baseURL" json:"base_url"`
+	WorkerImage  string `key:"workerImage" json:"worker_image"`
+	WorkerDiskGB int64  `key:"workerDiskGB" json:"worker_disk_gb"`
 }
 
 type ShadeformProviderConfig struct {

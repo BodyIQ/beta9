@@ -217,6 +217,9 @@ func reservationMatchesDemand(reservation Reservation, demand Demand) bool {
 	if len(demand.GPUs) > 0 && !slices.Contains(demand.GPUs, reservation.GPU) {
 		return false
 	}
+	if demand.GPUCount > 0 && reservation.GPUCount < demand.GPUCount {
+		return false
+	}
 	if len(demand.Providers) > 0 && !slices.Contains(demand.Providers, reservation.Provider) {
 		return false
 	}
