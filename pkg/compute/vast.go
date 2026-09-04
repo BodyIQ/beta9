@@ -6,26 +6,24 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 )
 
-const (
-	VastDefaultBaseURL = "https://console.vast.ai/api/v0"
-	// Beta9 workers need a rootful Docker daemon. Vast's regular instances do
-	// not support Docker-in-Docker, so managed workers must use Vast's KVM
-	// image, which provides a full Ubuntu VM with Docker and systemd.
-	VastWorkerImage  = "docker.io/vastai/kvm:ubuntu_cli_22.04-2025-11-21"
-	VastWorkerDiskGB = 32
-)
+const VastDefaultBaseURL = "https://console.vast.ai/api/v0"
 
 type VastClient struct {
-	api HTTPClient
+	api          HTTPClient
+	workerImage  string
+	workerDiskGB int64
 }
 
 type VastConfig struct {
-	APIKey  string
-	BaseURL string
-	Client  *http.Client
+	APIKey       string
+	BaseURL      string
+	WorkerImage  string
+	WorkerDiskGB int64
+	Client       *http.Client
 }
 
 func NewVast(config VastConfig) *VastClient {
@@ -39,6 +37,8 @@ func NewVast(config VastConfig) *VastClient {
 			Token:   config.APIKey,
 			Client:  config.Client,
 		},
+		workerImage:  strings.TrimSpace(config.WorkerImage),
+		workerDiskGB: config.WorkerDiskGB,
 	}
 }
 
@@ -46,12 +46,28 @@ func (c *VastClient) Name() string {
 	return "vast"
 }
 
+func (c *VastClient) validateWorkerConfig() error {
+	if c.workerImage == "" {
+		return fmt.Errorf("vast worker image is required")
+	}
+	if c.workerDiskGB <= 0 {
+		return fmt.Errorf("vast worker disk must be greater than zero GB")
+	}
+	return nil
+}
+
 func (c *VastClient) ListOffers(ctx context.Context, req OfferRequest) ([]Offer, error) {
+	if err := c.validateWorkerConfig(); err != nil {
+		return nil, err
+	}
+
 	body := map[string]any{
-		"type":        "on-demand",
-		"rentable":    map[string]any{"eq": true},
-		"verified":    map[string]any{"eq": true},
-		"vms_enabled": map[string]any{"eq": true},
+		"type":              "on-demand",
+		"rentable":          map[string]any{"eq": true},
+		"verified":          map[string]any{"eq": true},
+		"vms_enabled":       map[string]any{"eq": true},
+		"disk_space":        map[string]any{"gte": c.workerDiskGB},
+		"allocated_storage": c.workerDiskGB,
 	}
 	if len(req.GPUs) > 0 {
 		body["gpu_name"] = map[string]any{"in": vastGPUQueryNames(req.GPUs)}
@@ -77,6 +93,9 @@ func (c *VastClient) ListOffers(ctx context.Context, req OfferRequest) ([]Offer,
 		}
 		offer := vastOfferFromMap(m)
 		if offer.ID == "" || offer.GPUCount == 0 {
+			continue
+		}
+		if offer.StorageMB < c.workerDiskGB*1024 {
 			continue
 		}
 		if req.Nodes > 0 && offer.Available == 0 {
@@ -105,6 +124,9 @@ func vastGPUQueryNames(gpus []string) []string {
 }
 
 func (c *VastClient) CreateReservation(ctx context.Context, req ReservationRequest) (*Reservation, error) {
+	if err := c.validateWorkerConfig(); err != nil {
+		return nil, err
+	}
 	if req.Offer.ID == "" {
 		return nil, fmt.Errorf("missing Vast offer id")
 	}
@@ -115,9 +137,10 @@ func (c *VastClient) CreateReservation(ctx context.Context, req ReservationReque
 	body := map[string]any{
 		"label":     ReservationNodeName(req),
 		"client_id": clientID,
-		"image":     VastWorkerImage,
-		"disk":      VastWorkerDiskGB,
+		"image":     c.workerImage,
+		"disk":      c.workerDiskGB,
 		"runtype":   "ssh_direct",
+		"vm":        true,
 	}
 	if req.BootstrapCommand != "" {
 		body["onstart"] = fmt.Sprintf(`#!/usr/bin/env bash
@@ -157,6 +180,7 @@ fi
 		NodeCount:        firstNonZeroUint32(req.Offer.NodeCount, 1),
 		CPUMillicores:    req.Offer.CPUMillicores,
 		MemoryMB:         req.Offer.MemoryMB,
+		StorageMB:        c.workerDiskGB * 1024,
 		HourlyCostMicros: req.Offer.HourlyCostMicros,
 		CommittedMicros:  req.Offer.HourlyCostMicros * WholeHours(req.TTL),
 		Source:           req.Source,
@@ -172,7 +196,11 @@ func (c *VastClient) GetReservation(ctx context.Context, id string) (*Reservatio
 	if err := c.api.Do(ctx, http.MethodGet, fmt.Sprintf("/instances/%s/", id), nil, &raw); err != nil {
 		return nil, err
 	}
-	offer := vastOfferFromMap(raw)
+	instance := raw
+	if nested, ok := raw["instances"].(map[string]any); ok {
+		instance = nested
+	}
+	offer := vastOfferFromMap(instance)
 	return &Reservation{
 		ID:               id,
 		Provider:         c.Name(),
@@ -186,11 +214,12 @@ func (c *VastClient) GetReservation(ctx context.Context, id string) (*Reservatio
 		NodeCount:        firstNonZeroUint32(offer.NodeCount, 1),
 		CPUMillicores:    offer.CPUMillicores,
 		MemoryMB:         offer.MemoryMB,
+		StorageMB:        offer.StorageMB,
 		HourlyCostMicros: offer.HourlyCostMicros,
 		Status:           ReservationActive,
-		PublicIP:         jsonString(raw, "public_ipaddr", "public_ip"),
-		SSHHost:          jsonString(raw, "ssh_host"),
-		SSHPort:          jsonPort(raw, "ssh_port"),
+		PublicIP:         jsonString(instance, "public_ipaddr", "public_ip"),
+		SSHHost:          jsonString(instance, "ssh_host"),
+		SSHPort:          jsonPort(instance, "ssh_port"),
 	}, nil
 }
 
@@ -232,6 +261,7 @@ func vastOfferFromMap(m map[string]any) Offer {
 		NodeCount:        1,
 		CPUMillicores:    int64(jsonFloat64(m, "cpu_cores", "vcpus", "cpu") * 1000),
 		MemoryMB:         int64(jsonFloat64(m, "cpu_ram", "memory_mb", "ram") * 1024),
+		StorageMB:        int64(jsonFloat64(m, "disk_space", "storage_gb", "disk_gb") * 1024),
 		HourlyCostMicros: DollarsToMicros(hourlyCost),
 		Reliability:      jsonFloat64(m, "reliability2", "reliability", "score"),
 		Available:        uint32(jsonInt64(m, "available", "availability", "rentable_count")),

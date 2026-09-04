@@ -504,8 +504,10 @@ func (s *Service) computeVendors() map[string]model.Vendor {
 	vendors := map[string]model.Vendor{}
 	if s.appConfig.Providers.Vast.ApiKey != "" {
 		vendors["vast"] = model.NewVast(model.VastConfig{
-			APIKey:  s.appConfig.Providers.Vast.ApiKey,
-			BaseURL: s.appConfig.Providers.Vast.BaseURL,
+			APIKey:       s.appConfig.Providers.Vast.ApiKey,
+			BaseURL:      s.appConfig.Providers.Vast.BaseURL,
+			WorkerImage:  s.appConfig.Providers.Vast.WorkerImage,
+			WorkerDiskGB: s.appConfig.Providers.Vast.WorkerDiskGB,
 		})
 	}
 	if s.appConfig.Providers.Shadeform.ApiKey != "" {

@@ -25,6 +25,20 @@ Production deployment state does not live in this fork. The pinned chart,
 gateway image tag, public endpoint configuration, and operator deployment
 script live under `deploy/zinnia-apps/beta9` in `BodyIQ/zinnia-apps`.
 
+The Vast provider requires an explicit worker VM policy in the gateway config:
+
+```yaml
+providers:
+  vast:
+    apiKey: ${VAST_API_KEY}
+    workerImage: docker.io/vastai/kvm:ubuntu_cli_22.04-2025-11-21
+    workerDiskGB: 200
+```
+
+The worker disk is the rented VM's root partition, not a workload volume.
+Offer discovery requires enough available storage and asks Vast to price
+`dph_total` using this allocation before Beta9 applies its spend limits.
+
 ## Updating from upstream
 
 Keep the published `main` history stable. Bring upstream changes into a branch,
