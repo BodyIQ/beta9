@@ -52,6 +52,27 @@ func TestSolveSpecificMultiGPUNodeOffer(t *testing.T) {
 	require.Equal(t, "8xh100", plan.Actions[0].Offer.ID)
 }
 
+func TestSolveMinimumGPUCountPerNode(t *testing.T) {
+	plan := NewSolver().Solve(SolveInput{
+		Demand: Demand{
+			PoolName:       "multi-gpu",
+			GPUs:           []string{"H100"},
+			GPUCount:       4,
+			Nodes:          1,
+			TTL:            time.Hour,
+			MaxSpendMicros: DollarsToMicros(20),
+		},
+		Offers: []Offer{
+			{ID: "1xh100", Provider: "vast", GPU: "H100", GPUCount: 1, HourlyCostMicros: DollarsToMicros(2), Available: 1},
+			{ID: "8xh100", Provider: "vast", GPU: "H100", GPUCount: 8, HourlyCostMicros: DollarsToMicros(10), Available: 1},
+		},
+	})
+
+	require.True(t, plan.Feasible, plan.Reason)
+	require.Len(t, plan.Actions, 1)
+	require.Equal(t, "8xh100", plan.Actions[0].Offer.ID)
+}
+
 func TestAttachedCapacityIsFreeAndPreferred(t *testing.T) {
 	plan := NewSolver().Solve(SolveInput{
 		Demand: Demand{

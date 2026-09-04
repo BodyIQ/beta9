@@ -62,6 +62,7 @@ type ComputeVendor interface {
 
 type ComputeOfferRequest struct {
 	GPUs            []string
+	GPUCount        uint32
 	Nodes           uint32
 	OfferID         string
 	Providers       []string
@@ -189,6 +190,7 @@ type ComputePool struct {
 	Name           string
 	Selector       string
 	GPUs           []string
+	GPUCount       uint32
 	Nodes          uint32
 	OfferID        string
 	TTL            time.Duration
@@ -238,6 +240,9 @@ func (p ComputePool) MatchesOffer(offer ComputeOffer) bool {
 	if len(p.GPUs) > 0 && !slices.Contains(p.GPUs, offer.GPU) {
 		return false
 	}
+	if p.GPUCount > 0 && offer.GPUCount < p.GPUCount {
+		return false
+	}
 	if len(p.Providers) > 0 && !slices.Contains(p.Providers, offer.Provider) {
 		return false
 	}
@@ -278,6 +283,7 @@ type ComputeDemand struct {
 	PoolName       string
 	Selector       string
 	GPUs           []string
+	GPUCount       uint32
 	Nodes          uint32
 	OfferID        string
 	CPUMillicores  int64
@@ -294,6 +300,7 @@ func (d ComputeDemand) Pool() ComputePool {
 		Name:           d.PoolName,
 		Selector:       d.Selector,
 		GPUs:           d.GPUs,
+		GPUCount:       d.GPUCount,
 		Nodes:          d.Nodes,
 		OfferID:        d.OfferID,
 		TTL:            d.TTL,

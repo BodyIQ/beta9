@@ -38,13 +38,17 @@ func TestListOffersNormalizesVastBundle(t *testing.T) {
 		require.Equal(t, map[string]any{"gte": float64(testVastWorkerDiskGB)}, body["disk_space"])
 		require.Equal(t, float64(testVastWorkerDiskGB), body["allocated_storage"])
 		require.Equal(t, map[string]any{"in": []any{"RTX A6000"}}, body["gpu_name"])
+		require.Equal(t, map[string]any{"gte": float64(4)}, body["num_gpus"])
 		require.NotContains(t, body, "q")
-		_, _ = w.Write([]byte(`{"offers":[{"id":123,"gpu_name":"RTX A6000","num_gpus":8,"dph_total":10.5,"cpu_cores":64,"cpu_ram":512,"disk_space":750.5,"geolocation":"US","rentable_count":2}]}`))
+		_, _ = w.Write([]byte(`{"offers":[
+			{"id":123,"gpu_name":"RTX A6000","num_gpus":8,"dph_total":10.5,"cpu_cores":64,"cpu_ram":524288,"disk_space":750.5,"geolocation":"US","rentable_count":2},
+			{"id":124,"gpu_name":"RTX A6000","num_gpus":1,"dph_total":1.5,"cpu_cores":16,"cpu_ram":65536,"disk_space":750.5,"geolocation":"US","rentable_count":2}
+		]}`))
 	}))
 	defer server.Close()
 
 	client := NewVast(testVastConfig(server.URL))
-	offers, err := client.ListOffers(context.Background(), OfferRequest{GPUs: []string{"A6000"}})
+	offers, err := client.ListOffers(context.Background(), OfferRequest{GPUs: []string{"A6000"}, GPUCount: 4})
 
 	require.NoError(t, err)
 	require.Len(t, offers, 1)
@@ -52,6 +56,7 @@ func TestListOffersNormalizesVastBundle(t *testing.T) {
 	require.Equal(t, "vast", offers[0].Provider)
 	require.Equal(t, "A6000", offers[0].GPU)
 	require.Equal(t, uint32(8), offers[0].GPUCount)
+	require.Equal(t, int64(524288), offers[0].MemoryMB)
 	require.Equal(t, int64(750.5*1024), offers[0].StorageMB)
 	require.Equal(t, DollarsToMicros(10.5), offers[0].HourlyCostMicros)
 	require.Equal(t, uint32(2), offers[0].Available)

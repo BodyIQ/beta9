@@ -112,7 +112,7 @@ func (s *Service) reconcileOnDemandPool(ctx context.Context, workspaceID, gpu st
 		var launchedReservations []model.Reservation
 		if demand != nil {
 			reservationCount := len(state.Reservations)
-			launched, err := s.launchOnDemandCapacity(lockCtx, workspaceID, state, gpu, step, failover, now)
+			launched, err := s.launchOnDemandCapacity(lockCtx, workspaceID, state, gpu, step, failover, demand, now)
 			changed = launched || changed
 			if launched {
 				launchedReservations = append(launchedReservations, state.Reservations[reservationCount:]...)
@@ -193,7 +193,7 @@ func (s *Service) onDemandPoolState(ctx context.Context, workspaceID, gpu, poolN
 // machine per tick keeps the loop conservative: capacity arrives within a
 // minute of demand persisting, and a burst never overshoots by more than the
 // reconcile interval.
-func (s *Service) launchOnDemandCapacity(ctx context.Context, workspaceID string, state *model.PoolState, gpu string, step *types.FailoverOnDemandStep, failover types.FailoverConfig, now time.Time) (bool, error) {
+func (s *Service) launchOnDemandCapacity(ctx context.Context, workspaceID string, state *model.PoolState, gpu string, step *types.FailoverOnDemandStep, failover types.FailoverConfig, demand *model.FailoverDemand, now time.Time) (bool, error) {
 	active := activeOnDemandReservations(state, now)
 	if step.MaxNodes > 0 && len(active) >= step.MaxNodes {
 		return false, nil
@@ -216,6 +216,7 @@ func (s *Service) launchOnDemandCapacity(ctx context.Context, workspaceID string
 		Name:           state.Name,
 		Selector:       state.Name,
 		GPUs:           eligibleGPUs,
+		GPUCount:       demand.GPUCount,
 		Nodes:          1,
 		TTL:            onDemandReservationTTL,
 		Providers:      onDemandStepProviders(step),
@@ -231,6 +232,7 @@ func (s *Service) launchOnDemandCapacity(ctx context.Context, workspaceID string
 			PoolName:       pool.Name,
 			Selector:       pool.Selector,
 			GPUs:           pool.GPUs,
+			GPUCount:       pool.GPUCount,
 			Nodes:          pool.Nodes,
 			TTL:            pool.TTL,
 			Providers:      pool.Providers,

@@ -114,6 +114,7 @@ func (s *Service) launchPoolCapacityLocked(ctx context.Context, workspaceID, act
 			PoolName:       pool.Name,
 			Selector:       pool.Selector,
 			GPUs:           pool.GPUs,
+			GPUCount:       pool.GPUCount,
 			Nodes:          pool.Nodes,
 			OfferID:        pool.OfferID,
 			TTL:            pool.TTL,
@@ -556,6 +557,7 @@ func (s *Service) collectPoolOffers(ctx context.Context, pool model.Pool) ([]mod
 
 	request := model.OfferRequest{
 		GPUs:           pool.GPUs,
+		GPUCount:       pool.GPUCount,
 		Nodes:          pool.Nodes,
 		OfferID:        pool.OfferID,
 		Providers:      pool.Providers,

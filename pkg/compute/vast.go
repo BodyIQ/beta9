@@ -72,6 +72,9 @@ func (c *VastClient) ListOffers(ctx context.Context, req OfferRequest) ([]Offer,
 	if len(req.GPUs) > 0 {
 		body["gpu_name"] = map[string]any{"in": vastGPUQueryNames(req.GPUs)}
 	}
+	if req.GPUCount > 0 {
+		body["num_gpus"] = map[string]any{"gte": req.GPUCount}
+	}
 
 	var raw map[string]any
 	if err := c.api.Do(ctx, http.MethodPost, "/bundles/", body, &raw); err != nil {
@@ -96,6 +99,9 @@ func (c *VastClient) ListOffers(ctx context.Context, req OfferRequest) ([]Offer,
 			continue
 		}
 		if offer.StorageMB < c.workerDiskGB*1024 {
+			continue
+		}
+		if req.GPUCount > 0 && offer.GPUCount < req.GPUCount {
 			continue
 		}
 		if req.Nodes > 0 && offer.Available == 0 {
@@ -260,7 +266,7 @@ func vastOfferFromMap(m map[string]any) Offer {
 		GPUCount:         gpuCount,
 		NodeCount:        1,
 		CPUMillicores:    int64(jsonFloat64(m, "cpu_cores", "vcpus", "cpu") * 1000),
-		MemoryMB:         int64(jsonFloat64(m, "cpu_ram", "memory_mb", "ram") * 1024),
+		MemoryMB:         int64(jsonFloat64(m, "cpu_ram", "memory_mb")),
 		StorageMB:        int64(jsonFloat64(m, "disk_space", "storage_gb", "disk_gb") * 1024),
 		HourlyCostMicros: DollarsToMicros(hourlyCost),
 		Reliability:      jsonFloat64(m, "reliability2", "reliability", "score"),
